@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Taprac Login</title>
+  <link rel="stylesheet" href="login-popup.css" />
+</head>
+<body>
+  <div class="login-root">
+    <h3>Taprac Login</h3>
+    <div id="message" class="message"></div>
+    <label>Email</label>
+    <input id="email" type="email" />
+    <label>Password</label>
+    <input id="password" type="password" />
+    <button id="loginBtn">Log in</button>
+    <button id="closeBtn" class="link">Close</button>
+  </div>
+  <script>
+    const messageEl = document.getElementById('message');
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      if (!email || !password) { messageEl.textContent = 'Please enter email and password'; return; }
+      window.parent.postMessage({ type: 'login_submit', email, password }, '*');
+      messageEl.textContent = 'Logging in...';
+    });
+    window.addEventListener('message', (ev) => {
+      const msg = ev.data;
+      if (!msg || msg.type !== 'login_result') return;
+      if (msg.result && msg.result.ok) {
+        messageEl.textContent = 'Login successful';
+        setTimeout(() => {}, 800);
+      } else {
+        messageEl.textContent = 'Login failed: ' + (msg.result && msg.result.message ? msg.result.message : 'Unknown');
+      }
+    });
+    document.getElementById('closeBtn').addEventListener('click', () => { window.parent.postMessage({ type: 'close_login' }, '*'); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Taprac Sidebar</title>
+  <link rel="stylesheet" href="sidebar.css" />
+</head>
+<body>
+  <div id="taprac-root">
+    <header>
+      <h2>Taprac</h2>
+      <button id="closeBtn" title="Close">✕</button>
+    </header>
+    <div id="status">Status: Ready</div>
+    <section id="jobSummary">
+      <h3 id="jobTitle">Job Title</h3>
+      <div id="companyName">Company</div>
+      <div id="jobDesc" style="white-space:pre-wrap;max-height:100px;overflow:auto;font-size:12px;"></div>
+    </section>
+    <section id="coverSection">
+      <label>Cover Letter (editable)</label>
+      <textarea id="coverText" placeholder="Generate or paste your cover letter..."></textarea>
+      <div class="row">
+        <button id="genCover" class="secondary">Generate</button>
+        <button id="fillForm" class="secondary">Auto-fill Form</button>
+      </div>
+    </section>
+    <footer>
+      <button id="cancelBtn">Cancel</button>
+      <button id="submitBtn" class="primary">Submit Application</button>
+    </footer>
+  </div>
+  <script>
+    const statusEl = document.getElementById('status');
+    const jobTitleEl = document.getElementById('jobTitle');
+    const companyEl = document.getElementById('companyName');
+    const jobDescEl = document.getElementById('jobDesc');
+    const coverText = document.getElementById('coverText');
+    const genCoverBtn = document.getElementById('genCover');
+    const fillFormBtn = document.getElementById('fillForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const closeBtn = document.getElementById('closeBtn');
+    let currentJob = { job_title: '', company_name: '', job_description: '' };
+    let profileData = null;
+    let cvData = null;
+    window.addEventListener('message', (ev) => {
+      const msg = ev.data;
+      if (!msg || !msg.type) return;
+      if (msg.type === 'init') {
+        if (msg.job) { currentJob = msg.job; renderJob(); }
+      } else if (msg.type === 'login_success') {
+        statusEl.textContent = 'Status: Logged in ✓';
+        if (msg.job) { currentJob = msg.job; renderJob(); }
+      } else if (msg.type === 'profile_data') {
+        profileData = msg.profile; cvData = msg.cv; statusEl.textContent = 'Status: Profile loaded ✓';
+      } else if (msg.type === 'fill_done') {
+        statusEl.textContent = 'Status: Form auto-filled ✓';
+      } else if (msg.type === 'fill_error') {
+        statusEl.textContent = 'Fill error: ' + (msg.message || '?');
+      } else if (msg.type === 'subscription_error') {
+        statusEl.textContent = 'Error: Subscription required';
+        alert(msg.message || 'Subscription required');
+      } else if (msg.type === 'cover_generated') {
+        coverText.value = msg.cover_letter || '';
+        statusEl.textContent = 'Status: Cover letter generated ✓';
+      } else if (msg.type === 'cover_unavailable') {
+        statusEl.textContent = msg.message || 'Cover generation unavailable';
+        alert(msg.message || 'Cover generation unavailable - please add manually');
+      } else if (msg.type === 'submit_result') {
+        if (msg.result && msg.result.ok) {
+          statusEl.textContent = 'Status: ' + (msg.result.message || 'Submitted ✓');
+          alert(msg.result.message || 'Application submitted & saved to Taprac ✅');
+          setTimeout(() => { window.parent.postMessage({ type: 'close_sidebar' }, '*'); }, 2000);
+        } else {
+          statusEl.textContent = 'Submit: ' + (msg.result && msg.result.message ? msg.result.message : 'Unknown');
+          alert('Submission status: ' + (msg.result && msg.result.message ? msg.result.message : 'Unknown'));
+        }
+      }
+    });
+    function renderJob() {
+      jobTitleEl.textContent = currentJob.job_title || 'Job Title';
+      companyEl.textContent = currentJob.company_name || '';
+      jobDescEl.textContent = currentJob.job_description ? currentJob.job_description.slice(0, 250) : '';
+    }
+    window.parent.postMessage({ type: 'get_profile' }, '*');
+    genCoverBtn.addEventListener('click', () => {
+      statusEl.textContent = 'Status: Generating cover letter...';
+      window.parent.postMessage({ type: 'generate_cover_letter', job_title: currentJob.job_title || '', company_name: currentJob.company_name || '', job_description: currentJob.job_description || '' }, '*');
+    });
+    fillFormBtn.addEventListener('click', () => {
+      if (!profileData) {
+        statusEl.textContent = 'Loading profile...';
+        window.parent.postMessage({ type: 'get_profile' }, '*');
+        setTimeout(() => requestFill(), 800);
+        return;
+      }
+      requestFill();
+    });
+    function requestFill() {
+      statusEl.textContent = 'Status: Auto-filling form...';
+      window.parent.postMessage({ type: 'fill_form', profile: profileData, cv: cvData }, '*');
+    }
+    submitBtn.addEventListener('click', () => {
+      statusEl.textContent = 'Submitting application...';
+      window.parent.postMessage({ type: 'submit_application', job_title: currentJob.job_title || '', company_name: currentJob.company_name || '', cover_letter_text: coverText.value || '', source_url: window.location.href }, '*');
+    });
+    cancelBtn.addEventListener('click', () => { window.parent.postMessage({ type: 'close_sidebar' }, '*'); });
+    closeBtn.addEventListener('click', () => { window.parent.postMessage({ type: 'close_sidebar' }, '*'); });
+  </script>
+</body>
+</html>
